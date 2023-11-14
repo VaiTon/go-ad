@@ -10,33 +10,34 @@ import (
 )
 
 type Sender struct {
-	conn *net.TCPConn
-	rw   *bufio.ReadWriter
+	conn net.Conn
+	r    *bufio.Reader
 }
 
-func NewSender(endpoint *net.TCPAddr) (*Sender, error) {
-	conn, err := net.DialTCP("tcp", nil, endpoint)
+func Dial(endpoint string) (*Sender, error) {
+	conn, err := net.Dial("tcp", endpoint)
 	if err != nil {
 		return nil, fmt.Errorf("could not connect to %s: %w", endpoint, err)
 	}
 
-	rw := bufio.NewReadWriter(bufio.NewReader(conn), bufio.NewWriter(conn))
-
-	return &Sender{conn: conn, rw: rw}, nil
+	return &Sender{
+		conn: conn,
+		r:    bufio.NewReader(conn),
+	}, nil
 }
 
 func (s *Sender) Send(flag string) (flagsender.Result, error) {
-	flag += "\n" // "Each flag must be submitted in a single line terminated by a line feed (\n)."
-
-	_, err := s.rw.WriteString(flag)
+	_, err := s.conn.Write([]byte(flag + "\n"))
 	if err != nil {
 		return flagsender.Result{}, fmt.Errorf("could not send flag: %w", err)
 	}
 
-	resp, err := s.rw.ReadString('\n')
+	resp, err := s.r.ReadString('\n')
 	if err != nil {
 		return flagsender.Result{}, fmt.Errorf("could not read response: %w", err)
 	}
+
+	resp = strings.TrimSpace(resp) // remove final \n
 
 	splits := strings.Split(resp, " ")
 	if len(splits) < 1 {
@@ -44,7 +45,8 @@ func (s *Sender) Send(flag string) (flagsender.Result, error) {
 	}
 
 	status := splits[0]
-	status = strings.Trim(status, "[]")
+	status = strings.TrimPrefix(status, "[")
+	status = strings.TrimSuffix(status, "]")
 
 	result := flagsender.Result{Status: status, Msg: resp, Success: false}
 	if status == "OK" {
