@@ -1,4 +1,4 @@
-package saarctf
+package saar
 
 import (
 	"fmt"

@@ -1,4 +1,4 @@
-package saarctf
+package saar
 
 import (
 	"bufio"
@@ -9,24 +9,24 @@ import (
 	"github.com/VaiTon/go-ad"
 )
 
-type Sender struct {
+type Submitter struct {
 	conn net.Conn
 	r    *bufio.Reader
 }
 
-func Dial(endpoint string) (*Sender, error) {
+func Dial(endpoint string) (*Submitter, error) {
 	conn, err := net.Dial("tcp", endpoint)
 	if err != nil {
 		return nil, fmt.Errorf("could not connect to %s: %w", endpoint, err)
 	}
 
-	return &Sender{
+	return &Submitter{
 		conn: conn,
 		r:    bufio.NewReader(conn),
 	}, nil
 }
 
-func (s *Sender) Send(flag string) (flagsender.Result, error) {
+func (s *Submitter) Send(flag string) (flagsender.Result, error) {
 	_, err := s.conn.Write([]byte(flag + "\n"))
 	if err != nil {
 		return flagsender.Result{}, fmt.Errorf("could not send flag: %w", err)
@@ -48,14 +48,13 @@ func (s *Sender) Send(flag string) (flagsender.Result, error) {
 	status = strings.TrimPrefix(status, "[")
 	status = strings.TrimSuffix(status, "]")
 
-	result := flagsender.Result{Status: status, Msg: resp, Success: false}
-	if status == "OK" {
-		result.Success = true
-	}
-
-	return result, nil
+	return flagsender.Result{
+		Status:  status,
+		Msg:     resp,
+		Success: status == "OK",
+	}, nil
 }
 
-func (s *Sender) Close() error {
+func (s *Submitter) Close() error {
 	return s.conn.Close()
 }
